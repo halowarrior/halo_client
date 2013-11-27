@@ -1,6 +1,6 @@
 # Halo
 
-TODO: Write a gem description
+A halo client for learning Ruby programming concepts
 
 ## Installation
 
