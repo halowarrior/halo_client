@@ -1,3 +1,4 @@
+require 'file_buffer'
 module Halo
   class Map 
     # game types

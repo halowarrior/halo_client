@@ -25,8 +25,8 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rake'
   spec.add_development_dependency 'rspec'
 
-  spec.add_dependency 'micromachine'
+  #spec.add_dependency 'micromachine'
   spec.add_dependency 'rake-compiler'
   spec.add_dependency 'ffi'
-  spec.add_dependency 'crypt-tea'
+  #spec.add_dependency 'crypt-tea'
 end

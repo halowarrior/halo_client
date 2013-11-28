@@ -1,9 +1,7 @@
-require "halo/version"
-require 'halo/file_buffer'
-require 'halo/lib_c'
-require 'halo/map'
+require 'halo/version'
 require 'halo/client'
-require 'halo/tea'
+require 'halo/map'
+
 
 module Halo
   # Your code goes here...
