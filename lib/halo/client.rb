@@ -1,8 +1,3 @@
-require 'ffi'
-require 'packet'
-require 'tea'
-require 'game_spy'
-
 module Halo
   class Client
     extend FFI::Library
@@ -16,9 +11,9 @@ module Halo
                         ]
 
     def initialize(host, port, opts = {})
-      @hash = FFI::MemoryPointer(:char, 17)
-      @encryption_key = FFI::MemoryPointer(:char, 17)
-      @decryption_key = FFI::MemoryPointer(:char, 17)
+      @hash = FFI::MemoryPointer.new(:int32, 17)
+      @encryption_key = FFI::MemoryPointer.new(:int32, 17)
+      @decryption_key = FFI::MemoryPointer.new(:int32, 17)
       @buffer = []
       @host = host
       @port = port
@@ -39,30 +34,42 @@ module Halo
       case @state
       when :connected
         packet = Packet.create({function: 1, number: @packet_number, message: GameSpy.challenge }) #CHALLENGE_HEADERS[0] + GameSpy.challenge
-        send(packet)
+        send(packet.build)
         @packet_number += 1
         @state = :process_challenge
       when :process_challenge
         if server_packet = @buffer.shift
-          server_packet = Packet.from_buffer(packet)
-          client_packet = Packet.create({function: 3, number: @packet_number})
+          server_packet = Packet.from_buffer(server_packet)
+          client_packet = Packet.create({function: 3, number: @packet_number, unknown_number: "\x01" })
+          Tea.generate_key(@hash, nil, @encryption_key)
           client_packet.message = GameSpy.challenge(server_packet.message[32..-1]) + 
                                   Tea.generate_key(@hash, nil, @encryption_key) + 
                                   encode_version(VERSION)
 
-          report_parse_error(client_packet.message) unless client_packet.message.length == 64
-          send(packet,0)
+
+          raise_parse_error(client_packet.message) unless client_packet.message.length + 7 == 59
+          send(client_packet.build)
           @packet_number += 1
-          @state = :finished
+          @state = :generate_keys
         end
-      when :finished
+      when :generate_keys
         if server_packet = @buffer.shift
           server_packet = Packet.from_buffer(server_packet)
-          report_parse_error(server_packet.message) unless server_packet.message.length == 64
-          Tea.generate_key(@hash, server_packet.message, @encryption_key);
-          Tea.generate_key(@hash, server_packet.message, @decryption_key);
+          # debugger
+          # raise_parse_error(server_packet.message) unless server_packet.message.length == 64
+          Tea.generate_key(@hash, server_packet.message, @encryption_key)
+          Tea.generate_key(@hash, server_packet.message, @decryption_key)
+          @state = :start_encrypted_communication
+        end
+      when :start_encrypted_communication
+        if server_packet = @buffer.shift 
+          debugger
+          @tea = Tea.new(@encryption_key, @decryption_key, @hash)
+          server_packet = Packet.from_buffer(server_packet, { opts: { cryptor: @tea }})
+          puts 1
         end
       end
+
     end
 
     private

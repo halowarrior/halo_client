@@ -1,6 +1,12 @@
+require 'ffi'
 require 'halo/version'
+require 'halo/util'
+require 'halo/packet'
 require 'halo/client'
+require 'halo/file_buffer'
 require 'halo/map'
+require 'halo/tea'
+require 'halo/game_spy'
 
 
 module Halo
