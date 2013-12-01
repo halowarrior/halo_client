@@ -6,13 +6,16 @@ module Halo
     attach_function :gssdkcr, [:pointer, :pointer, :pointer], :void
 
     def self.challenge( challenge_string = nil)
-      challenge_string = Util.zerod_binary_string(32) unless challenge_string
-      challenge =  FFI::MemoryPointer.new(:int32, 33)
-      result = FFI::MemoryPointer.new(:int32, 33)
+      challenge =  FFI::MemoryPointer.new(:uint32, 33 * 4)
+      result = FFI::MemoryPointer.new(:uint32, 33 * 4)
+      if ! challenge_string
+        LibC.memset(challenge, 0, 32);
+      else
+        challenge.write_string challenge_string 
+      end
 
-      challenge.write_string challenge_string 
       gssdkcr(result, challenge, nil)
-      result.read_string_to_null
+      result.read_string(32)
     end
   end
 end

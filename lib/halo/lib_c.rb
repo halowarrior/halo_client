@@ -13,6 +13,7 @@ module LibC
   
   # memory movers
   attach_function :memcpy, [:pointer, :pointer, :size_t], :pointer
+  attach_function :memset, [:pointer, :int, :size_t], :void
   attach_function :bcopy, [:pointer, :pointer, :size_t], :void
   
 end # module LibC
