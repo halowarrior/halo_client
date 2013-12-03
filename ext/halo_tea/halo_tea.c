@@ -112,17 +112,77 @@ LICENSE
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/times.h>
 
 typedef uint8_t     u8;
 typedef uint16_t    u16;
 typedef uint32_t    u32;
 
 
-#include <sys/times.h>
+
+#pragma pack(1)
+typedef struct {
+    u16     sign;
+    u8      type;
+    u16     gs1;
+    u16     gs2;
+} gh_t;
+#pragma pack()
+
 
 // need to call srand (time(NULL));
 // segfault with times(0) on os x 
 #define HALO_RAND   (uint32_t)rand()          // 100/s resolution
+
+#define MX (z >> 5 ^ y << 2) + (y >> 3 ^ z << 4) ^ (sum ^ y) + (key[p & 3 ^ e] ^ z);
+
+
+
+unsigned int read_bits(    // number read
+  unsigned int bits,       // how much bits to read
+  unsigned char *in,       // buffer from which to read the number
+  unsigned int in_bits     // position of the buffer in bits
+) {
+    unsigned int    seek_bits,
+                    rem,
+                    seek = 0,
+                    ret  = 0,
+                    mask = 0xffffffff;
+
+    if(bits > 32) return(0);
+    if(bits < 32) mask = (1 << bits) - 1;
+    for(;;) {
+        seek_bits = in_bits & 7;
+        ret |= ((in[in_bits >> 3] >> seek_bits) & mask) << seek;
+        rem = 8 - seek_bits;
+        if(rem >= bits) break;
+        bits    -= rem;
+        in_bits += rem;
+        seek    += rem;
+        mask     = (1 << bits) - 1;
+    }
+    return(ret);
+}
+
+enum cryptography_xxtea_block_size
+{
+        _cryptography_xxtea_block_size_8        = 8, // minimum block size for XXTEA is 64 bits
+        _cryptography_xxtea_block_size_16       = 16,
+        _cryptography_xxtea_block_size_32       = 32,
+        _cryptography_xxtea_block_size_64       = 64,
+        _cryptography_xxtea_block_size_128      = 128,
+        _cryptography_xxtea_block_size_256      = 256,
+
+        _cryptography_xxtea_block_size,
+};
+
 
 void genkeys(u8 *hash1, u8 *hash2, u8 *skey1, u8 *skey2, u8 *dkey1, u8 *dkey2) {
     halo_generate_keys(hash1, skey1, dkey1);
@@ -291,7 +351,18 @@ void halo_create_key(uint8_t *keystr, uint8_t *randhash, uint8_t *fixnum, uint8_
     }
 }
 
-
+ 
+void wiki_decrypt (uint32_t* v, uint32_t* k) {
+    uint32_t v0=v[0], v1=v[1], sum=0xC6EF3720, i;  /* set up */
+    uint32_t delta=0x9e3779b9;                     /* a key schedule constant */
+    uint32_t k0=k[0], k1=k[1], k2=k[2], k3=k[3];   /* cache key */
+    for (i=0; i<32; i++) {                         /* basic cycle start */
+        v1 -= ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3);
+        v0 -= ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1);
+        sum -= delta;                                   
+    }                                              /* end cycle */
+    v[0]=v0; v[1]=v1;
+}
 
 void tea_decrypt(uint32_t *p, uint32_t *keyl) {
     uint32_t    y,
@@ -333,6 +404,57 @@ void halo_tea_decrypt(uint8_t *data, int size, uint8_t *key) {
 }
 
 
+// bool Decrypt(cryptography_xxtea_block_size block_size,
+//     char* data,
+//     uint32 data_length,
+//     byte* key)
+// {
+//     ASSERT(block_size > Enums::_cryptography_xxtea_block_size_256, "invalid xxtea block size");
+
+//     // if there is not enough data to fill at least one decryption block then it cannot be decrypted
+//     if(data_length < (uint32)block_size)
+//         return false;
+
+//     uint32 block_count = data_length / block_size;
+//     uint32 block_remainder = data_length % block_size;
+
+//     // if there is data left over at the end that does not fill a decryption block, a full block is taken and decrypted seperately,
+//     // resulting in the overlap getting double decrypted
+//     char* data_pointer;
+//     if(block_remainder)
+//     {
+//         data_pointer = data + (data_length - block_size);
+//         XXTEADecrypt(CAST_PTR(unsigned long*, data_pointer), block_size / 4, CAST_PTR(long*, key));
+//     }
+
+//     // decrypt the data in individual blocks, up to however many can be fit in the data provided
+//     data_pointer = data;
+//     for(uint32 i = 0; i < block_count; i++)
+//     {
+//         XXTEADecrypt(CAST_PTR(unsigned long*, data_pointer), block_size / 4, CAST_PTR(long*, key));
+//         data_pointer += block_size;
+//     }
+
+//     return true;
+// }
+
+
+void XXTEADecrypt(unsigned long* data, unsigned long block_size, long* key)
+{
+        unsigned long z = data[block_size - 1], y = data[0], sum = 0, e, DELTA = 0x9e3779b9;
+        unsigned long p, q ;
+
+        q = 6 + 52 / block_size;
+        sum = q * DELTA;
+        while (sum != 0)
+        {
+                e = (sum >> 2) & 3;
+                for (p = block_size - 1; p > 0; p--) z = data[p - 1], y = data[p] -= MX;
+                z = data[block_size - 1];
+                y = data[0] -= MX;
+                sum -= DELTA;
+        }
+}
 
 void tea_encrypt(uint32_t *p, uint32_t *keyl) {
     uint32_t    y,
@@ -454,6 +576,75 @@ uint32_t halo_crc32(uint8_t *data, int size) {
 
 
 
+int read_bstr(u8 *data, u32 len, u8 *buff, u32 bitslen) {
+    int     i;
+
+    for(i = 0; i < len; i++) {
+        data[i] = read_bits(8, buff, bitslen);
+        bitslen += 8;
+    }
+    return(bitslen);
+}
+void halobits(u8 *buff, int buffsz) {
+    int     b,
+            n,
+            o;
+    u8      str[1 << 11];
+
+    buffsz -= 4;    // crc;
+    if(buffsz <= 0) return;
+    buffsz <<= 3;
+
+    for(b = 0;;) {
+        if((b + 11) > buffsz) break;
+        n = read_bits(11, buff, b);     b += 11;
+
+        if((b + 1) > buffsz) break;
+        o = read_bits(1,  buff, b);     b += 1;
+
+        if((b + n) > buffsz) break;
+        b = read_bstr(str, n, buff, b);
+        show_dump(str, n, stdout);
+    }
+}
+
+
+
+
+void show_dump(unsigned char *data, unsigned int len, FILE *stream) {
+    const static char       hex[] = "0123456789abcdef";
+    static unsigned char    buff[67];   /* HEX  CHAR\n */
+    unsigned char           chr,
+                            *bytes,
+                            *p,
+                            *limit,
+                            *glimit = data + len;
+
+    memset(buff + 2, ' ', 48);
+
+    while(data < glimit) {
+        limit = data + 16;
+        if(limit > glimit) {
+            limit = glimit;
+            memset(buff, ' ', 48);
+        }
+
+        p     = buff;
+        bytes = p + 50;
+        while(data < limit) {
+            chr = *data;
+            *p++ = hex[chr >> 4];
+            *p++ = hex[chr & 15];
+            p++;
+            *bytes++ = ((chr < ' ') || (chr >= 0x7f)) ? '.' : chr;
+            data++;
+        }
+        *bytes++ = '\n';
+
+        fwrite(buff, bytes - buff, 1, stream);
+    }
+}
+
 
 
 unsigned char *gssdkcr(
@@ -472,7 +663,7 @@ unsigned char *gssdkcr(
     const static char
                     key_default[] =
                     "3b8dd8995f7c40a9a5c5b7dd5b481341";
-
+    srand (time(NULL));
     randnum = time(NULL);   // something random
     if(!key) key = (unsigned char *)key_default;
     keysz = strlen(key);

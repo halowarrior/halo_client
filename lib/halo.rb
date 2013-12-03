@@ -9,7 +9,7 @@ require 'halo/client'
 require 'halo/file_buffer'
 require 'halo/map'
 require 'halo/tea'
-require 'halo/tea_2'
+require 'halo/tea_3'
 require 'halo/game_spy'
 
 

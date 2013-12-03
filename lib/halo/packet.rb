@@ -23,6 +23,7 @@ module Halo
         @function = input.delete(:function) || 0
         @seq      = input.delete(:seq)
         @ack      = input.delete(:ack) || 0
+        @message  = input.delete(:message)
         input.each{ |key, val| self.instance_variable_set(:"@#{key}", val) }
       else
         raise "Invalid input type (#{input.class.to_s}): #{self.inspect}"
