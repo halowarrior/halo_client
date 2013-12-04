@@ -9,13 +9,12 @@ require 'halo/client'
 require 'halo/file_buffer'
 require 'halo/map'
 require 'halo/tea'
-require 'halo/tea_3'
 require 'halo/game_spy'
 
 
 module Halo
-  # Your code goes here...
-
+  
+  # for running tests in the debugger
   def self.test
     host = '127.0.0.1'
     port = '3400'
@@ -23,6 +22,5 @@ module Halo
     port = 2306
     client = Halo::Client.new(host,port)
     client.connect
-
   end
 end
