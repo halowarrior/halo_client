@@ -16,4 +16,4 @@ module LibC
   attach_function :memset, [:pointer, :int, :size_t], :void
   attach_function :bcopy, [:pointer, :pointer, :size_t], :void
   
-end # module LibC
+end
