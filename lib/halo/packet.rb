@@ -1,13 +1,6 @@
 module Halo
   class Packet
-    extend FFI::Library
-
-    ffi_lib File.expand_path('../../halo_tea.bundle', __FILE__)
-    attach_function :halo_crc32, [:pointer, :int32], :int32
-
-    attr_accessor :message, :function, :number, :unknown_number, :header # might need this for debugging
-
-    @@mutex = Mutex.new
+    attr_accessor :message, :function, :number, :unknown_number, :header
     @@seq = -1
 
     def self.reset
@@ -67,15 +60,5 @@ module Halo
       @opts[:send_proc].call( as_bytestream )
       @@seq +=1
     end
-
-    def to_s
-
-    end
-
-    private
-
-      def crc32(data)
-        halo_crc32(data.to_ptr, data.length)
-      end
   end
 end

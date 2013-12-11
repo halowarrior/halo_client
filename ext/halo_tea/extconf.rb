@@ -1,2 +1,4 @@
 require 'mkmf'
-create_makefile "halo_tea/halo_tea"
+
+RbConfig::CONFIG['DLEXT'] = 'so'
+create_makefile 'halo_tea/halo_tea'

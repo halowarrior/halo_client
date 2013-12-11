@@ -2,23 +2,24 @@
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'halo/version'
+require 'rake/extensiontask'
 
 
 Gem::Specification.new do |spec|
-  spec.name          = "halo"
+  spec.name          = 'halo'
   spec.version       = Halo::VERSION
-  spec.authors       = ["Adam Hallett"]
-  spec.email         = ["harddrivecaddy@gmail.com"]
+  spec.authors       = ['Adam Hallett']
+  spec.email         = ['adam.t.hallett@gmail.com']
   spec.description   = %q{Halo Ruby}
   spec.summary       = %q{Halo Ruby}
-  spec.homepage      = ""
-  spec.license       = "MIT"
+  spec.homepage      = ''
+  spec.license       = 'MIT'
 
   spec.files         = `git ls-files`.split($/)
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
-  spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
+  spec.test_files    = spec.files.grep(%r{^(spec)/})
   spec.require_paths = ['lib']
-  spec.extensions    = %w[ext/halo/extconf.rb]
+  spec.extensions    = FileList['ext/**/extconf.rb']
 
   spec.add_development_dependency 'bundler', '~> 1.3'
   spec.add_development_dependency 'debugger'
@@ -29,4 +30,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'rake-compiler'
   spec.add_dependency 'ffi'
   spec.add_dependency 'crypt-tea'
+
+  Rake::ExtensionTask.new('halo_tea', spec)
 end
