@@ -1,0 +1,3 @@
+require 'halo'
+
+Halo.test
