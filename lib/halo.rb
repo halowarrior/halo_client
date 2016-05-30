@@ -7,6 +7,7 @@ require 'game_spy'
 
 require 'halo/util'
 require 'halo/message'
+require 'halo/payload/base'
 require 'halo/client'
 require 'halo/file_buffer'
 require 'halo/map'

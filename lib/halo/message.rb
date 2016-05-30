@@ -26,26 +26,28 @@ module Halo
 
     def parse( buffer )
       if buffer.start_with?(GTI2_MAGIC_STRING)
-        @header = buffer[0..6] # 7 bytes
+        @header = buffer[0..6]
         @type = buffer[2].unpack("C").first
         @sn = buffer[3..4].unpack("S>").first
         @esn = buffer[5..6].unpack("S>").first
       end
 
-      if @opts[:cryptor]
-        data = buffer[7..-5]
-        packet_crc = buffer[-4..-1].unpack('L') # 4 byte crc32
-        raise "CRC checksum failed (#{crc32(data)},#{packet_crc}) on Packet\##{self.object_id}" if crc32(data) != packet_crc
-        @data = @opts[:cryptor].send(:decrypt, data)
+      if is_encrypted?
+        @data = decrypt(buffer[7..-1])
       else
         @data = buffer[7..-1]
       end
     end
 
     def as_bytes
-      raise "Error: Cannot build a new packet with an incoming packet instance #{self.inspect}" if @direction == :incoming
       m = build_header
-      m += @data if @data
+      if @data
+        if encrypt?
+          m += encrypt(@data)
+        else
+          m += @data
+        end
+      end
       m
     end
 
@@ -77,5 +79,12 @@ module Halo
       header
     end
 
+    def is_encrypted?
+      @sn >= 2 && @esn >= 2
+    end
+
+    def encrypt?
+      @sn >= 2 && @esn >= 3
+    end
   end
 end

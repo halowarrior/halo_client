@@ -1,19 +1,12 @@
 require 'bindata'
-class BitString < BinData::String
-  bit_aligned
-end
-class DecryptedPayload < BinData::Record
 
+class DecryptedPayload < BinData::Record
   endian :little
   bit11le :len
-  bit1le :something
-  array :data, :initial_length => Proc.new{ (len * 8 - 12) / 8 }, :type => :bit8le
+  bit1le :mode
+  bit7le :type
+  # array :data, :initial_length => Proc.new{ (len * 8 - 12) / 8 }, :type => :bit8le
 
-
-  # bit_string :data, length: 30
-
-  # array :test, :initial_length => 25, :type => :bit8le
-  # string :data, :read_length => 30
 end
 
 class DecryptedPayload2 < BinData::Record
@@ -54,62 +47,32 @@ module Halo
     def run
       case @state
       when :connected
-        @challenge ||= GameSpy::Challenge.generate
-        send_message Message.new(type: Message::GTI2MsgClientChallenge,
-          data: @challenge,
-          sn: @sn,
-          esn: @esn
-        )
+        send_message build_client_challenge
         @sn += 1
         @esn += 1
-        change_state(:process_challenge)
-      when :process_challenge
+        change_state(:server_challenge_response)
+      when :server_challenge_response
         if m = next_message
           if m.type == Message::GTI2MsgServerChallenge
-            client_challenge_response =  m.data[0..31]
-            server_challenge = m.data[32..63]
-
-            if ! GameSpy::Challenge.check_response(GameSpy::Challenge.get_response(@challenge), client_challenge_response)
-              raise "Client challenge response verification failed"
-            end
-            server_challenge_response = GameSpy::Challenge.get_response(server_challenge)
-
-            m = Message.new({type: Message::GTI2MsgClientResponse,
-              sn: @sn,
-              esn: @esn,
-              data: server_challenge_response + @encryption_key + encode_version(VERSION)
-            })
-            raise_parse_error(m.data) unless m.data.length + 7 == 59
-            send_message(m)
+            verify_client_challenge_response(m.data)
+            send_message build_server_challenge_response(m.data)
             change_state(:generate_keys)
           end
         end
       when :generate_keys
         if m = next_message
           if m.type == Message::GTI2MsgAccept
-            none, @encryption_key2 = HaloTea::Crypto.generate_keys(@random_hash, m.data)
-            none, @decryption_key2 = HaloTea::Crypto.generate_keys(@random_hash, m.data)
+            generate_crypto_keys
             change_state(:join)
           end
         end
       when :join
         if m = next_message
           if m.sn == 2 && m.esn == 2
-            decrypted = HaloTea::Crypto.decrypt(m.data, @encryption_key2)
-            checksum = decrypted.slice!(-4,4).unpack("L<").first
-            data = decrypted
             len = BinData::Bit11le.read(decrypted)
-            if HaloTea::Crypto.crc32(data) != checksum
-              raise "Message validation failed: #{m.inspect}"
-            end
 
           end
         end
-        # fe fe 00 00 02 00 02                              .......
-        # 0c 02 01 73 63 72 77 73 7a 63 00 01 00 00 00 01   ...scrwszc......
-        # 00 00 00 00 69 6d 70 6f 73 69 6e 67 5f 31 00 04   ....imposing_1..
-        # 10 6c                                             .l
-
       when :get_server_keys
         if server_packet = next_message
           if server_packet.function == 0
@@ -124,6 +87,37 @@ module Halo
 
     private
 
+    def generate_crypto_keys
+      none, @encryption_key = HaloTea::Crypto.generate_keys(@random_hash, m.data)
+      none, @decryption_key = HaloTea::Crypto.generate_keys(@random_hash, m.data)
+    end
+
+    def verify_client_challenge_response( data )
+      client_challenge_response =  data[0..31]
+      if ! GameSpy::Challenge.check_response(GameSpy::Challenge.get_response(@challenge), client_challenge_response)
+        raise "Client challenge response verification failed"
+      end
+    end
+
+    def build_server_challenge_response( data )
+      server_challenge = data[32..63]
+      server_challenge_response = GameSpy::Challenge.get_response(server_challenge)
+      Message.new({type: Message::GTI2MsgClientResponse,
+        sn: @sn,
+        esn: @esn,
+        data: server_challenge_response + @encryption_key + encode_version(VERSION)
+      })
+    end
+
+    def build_client_challenge
+      @challenge ||= GameSpy::Challenge.generate
+      Message.new(type: Message::GTI2MsgClientChallenge,
+        data: @challenge,
+        sn: @sn,
+        esn: @esn
+      )
+    end
+
     def change_state new_state
       @state = new_state.to_sym
     end
@@ -136,18 +130,16 @@ module Halo
       raise "Error: Could not parse packet #{data} for state #{@state}"
     end
 
-    def read( length = 20000 )
-      bytes = @socket.recvfrom_nonblock(length) rescue ['']
+    def read( len = 20000 )
+      bytes = @socket.recvfrom_nonblock(len) rescue ['']
       @buffer << bytes.first if bytes.first.length > 0
     end
 
     def next_message
       read
       if payload = @buffer.shift
-        puts 'HEREEEE'
-        puts payload.inspect
         if payload.length >= 7
-          m = Message.new(payload)
+          m = Message.new(payload, { decryption_key: @encryption_key2 })
           logger.info("Reading message from server: #{m.explain}")
           m
         end
