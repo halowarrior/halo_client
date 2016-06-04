@@ -1,7 +1,8 @@
 module Halo
   class Payload
-    def initialize(data, _opts = {})
+    def initialize(data, opts = {})
       @data = data
+      @opts = opts
     end
 
     def encrypt(data)
