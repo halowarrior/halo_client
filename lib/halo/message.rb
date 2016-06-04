@@ -1,11 +1,6 @@
 module Halo
   class Message < GameSpy::Messsage
     attr_accessor :header, :type, :sn, :esn, :data
-    @@seq = -1
-
-    def self.reset
-      @@seq = -1
-    end
 
     def initialize(input = nil, opts = {})
       @opts = opts
