@@ -4,6 +4,7 @@ require 'logger'
 require 'byebug'
 require 'halo_tea'
 require 'game_spy'
+require 'micromachine'
 
 require 'halo/util'
 require 'halo/message'

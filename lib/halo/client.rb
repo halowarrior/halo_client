@@ -23,52 +23,48 @@ module Halo
     VERSION = 616000
 
     def initialize(host, port, opts = {})
-      @buffer = []
       @host = host
       @port = port
       @opts = opts
-
       @sn = 0
       @esn = 0
       @state = :connecting
       @socket = UDPSocket.new(Socket::AF_INET)
       @log_file = opts[:log_file]
-      @challenge = nil
-      @random_hash, @encryption_key = HaloTea::Crypto.generate_keys
-      @decryption_key = nil
     end
 
     def connect
       @socket.connect(@host, @port)
-      @state = :connected
-      run while @state != :finished
+      @machine = build_state_machine
+      @machine.trigger(:connected)
+      @random_hash, @encryption_key = HaloTea::Crypto.generate_keys
+      run while @machine.state != :finished
     end
 
     def run
-      case @state
-      when :connected
+      case @machine.state
+      when :send_client_challenge
         send_message build_client_challenge
-        @sn += 1
-        @esn += 1
-        change_state(:server_challenge_response)
-      when :server_challenge_response
+        @machine.trigger :send_client_challenge
+      when :read_client_challenge_response
         if m = next_message
           if m.type == Message::GTI2MsgServerChallenge
             verify_client_challenge_response(m.data)
             send_message build_server_challenge_response(m.data)
-            change_state(:generate_keys)
+            @machine.trigger(:read_client_challenge_response)
           end
         end
       when :generate_keys
         if m = next_message
           if m.type == Message::GTI2MsgAccept
-            generate_crypto_keys
-            change_state(:join)
+            generate_crypto_keys(m.data)
+            @machine.trigger(:generate_keys)
           end
         end
-      when :join
+      when :read_server_join
         if m = next_message
           if m.sn == 2 && m.esn == 2
+            debugger
             len = BinData::Bit11le.read(decrypted)
 
           end
@@ -87,9 +83,18 @@ module Halo
 
     private
 
-    def generate_crypto_keys
-      none, @encryption_key = HaloTea::Crypto.generate_keys(@random_hash, m.data)
-      none, @decryption_key = HaloTea::Crypto.generate_keys(@random_hash, m.data)
+    def build_state_machine
+      @machine = MicroMachine.new(:new)
+      @machine.when(:connected, new: :send_client_challenge)
+      @machine.when(:send_client_challenge, send_client_challenge: :read_client_challenge_response)
+      @machine.when(:read_client_challenge_response, read_client_challenge_response: :generate_keys)
+      @machine.when(:generate_keys, generate_keys: :read_server_join)
+      @machine
+    end
+
+    def generate_crypto_keys(data)
+      none, @encryption_key = HaloTea::Crypto.generate_keys(@random_hash, data)
+      none, @decryption_key = HaloTea::Crypto.generate_keys(@random_hash, data)
     end
 
     def verify_client_challenge_response( data )
@@ -103,8 +108,8 @@ module Halo
       server_challenge = data[32..63]
       server_challenge_response = GameSpy::Challenge.get_response(server_challenge)
       Message.new({type: Message::GTI2MsgClientResponse,
-        sn: @sn,
-        esn: @esn,
+        sn: 1,
+        esn: 1,
         data: server_challenge_response + @encryption_key + encode_version(VERSION)
       })
     end
@@ -113,8 +118,8 @@ module Halo
       @challenge ||= GameSpy::Challenge.generate
       Message.new(type: Message::GTI2MsgClientChallenge,
         data: @challenge,
-        sn: @sn,
-        esn: @esn
+        sn: 0,
+        esn: 0
       )
     end
 
@@ -126,12 +131,9 @@ module Halo
       [ version ].pack('L<')
     end
 
-    def raise_parse_error(data)
-      raise "Error: Could not parse packet #{data} for state #{@state}"
-    end
-
     def read( len = 20000 )
       bytes = @socket.recvfrom_nonblock(len) rescue ['']
+      @buffer ||= []
       @buffer << bytes.first if bytes.first.length > 0
     end
 
