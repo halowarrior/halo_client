@@ -7,7 +7,7 @@ module Halo
       @@seq = -1
     end
 
-    def initialize( input = nil, opts = {} )
+    def initialize(input = nil, opts = {})
       @opts = opts
       case input.class.to_s.downcase
       when 'string'
@@ -20,16 +20,16 @@ module Halo
 
         @header =   build_header
       else
-        raise "Invalid input type (#{input.class.to_s}): #{self.inspect}"
+        fail "Invalid input type (#{input.class}): #{inspect}"
       end
     end
 
-    def parse( buffer )
+    def parse(buffer)
       if buffer.start_with?(GTI2_MAGIC_STRING)
         @header = buffer[0..6]
-        @type = buffer[2].unpack("C").first
-        @sn = buffer[3..4].unpack("S>").first
-        @esn = buffer[5..6].unpack("S>").first
+        @type = buffer[2].unpack('C').first
+        @sn = buffer[3..4].unpack('S>').first
+        @esn = buffer[5..6].unpack('S>').first
       end
 
       if is_encrypted?
@@ -52,7 +52,7 @@ module Halo
     end
 
     def explain
-      type_text = @header.start_with?(GTI2_MAGIC_STRING) ? "Reliable" : "Unreliable"
+      type_text = @header.start_with?(GTI2_MAGIC_STRING) ? 'Reliable' : 'Unreliable'
       complete_message = as_bytes
 
       %(
@@ -60,10 +60,10 @@ module Halo
         Type: #{@type}
         SN: #{@sn}
         ESN: #{@esn}
-        Data: #{@data.unpack("H*").first}
+        Data: #{@data.unpack('H*').first}
         Data Len: #{@data.length}
 
-        Complete Message: #{complete_message.unpack("H*").first}
+        Complete Message: #{complete_message.unpack('H*').first}
         Complete Len: #{complete_message.length}
       )
     end
@@ -71,11 +71,11 @@ module Halo
     private
 
     def build_header
-      header = GTI2_MAGIC_STRING.force_encoding("ASCII-8BIT")
+      header = GTI2_MAGIC_STRING.force_encoding('ASCII-8BIT')
       header += [@type].pack('C')
       header += [@sn].pack('S>')
       header += [@esn].pack('S>')
-      raise "ERROR: header wrong len" unless header.length == 7
+      fail 'ERROR: header wrong len' unless header.length == 7
       header
     end
 

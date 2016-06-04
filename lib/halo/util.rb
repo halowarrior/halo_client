@@ -6,8 +6,8 @@ module Halo
       s.split(' ').map { |x| x.hex.chr }.join
     end
 
-    def self.zerod_binary_string( length )
-      (1..length).map{"\x00"}.join
+    def self.zerod_binary_string(length)
+      (1..length).map { "\x00" }.join
     end
   end
 
@@ -17,7 +17,7 @@ module Halo
     end
 
     def self.hex_to_bin(s)
-      s.scan(/../).map { |x| x.hex }.pack('c*')
+      s.scan(/../).map(&:hex).pack('c*')
     end
   end
 end

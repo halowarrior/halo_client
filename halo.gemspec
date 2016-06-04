@@ -8,12 +8,12 @@ Gem::Specification.new do |spec|
   spec.version       = Halo::VERSION
   spec.authors       = ['Adam Hallett']
   spec.email         = ['adam.t.hallett@gmail.com']
-  spec.description   = %q{Halo Ruby}
-  spec.summary       = %q{Halo Ruby}
+  spec.description   = 'Halo Ruby'
+  spec.summary       = 'Halo Ruby'
   spec.homepage      = ''
   spec.license       = 'MIT'
 
-  spec.files         = `git ls-files`.split($/)
+  spec.files         = `git ls-files`.split($INPUT_RECORD_SEPARATOR)
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
   spec.test_files    = spec.files.grep(%r{^(spec)/})
   spec.require_paths = ['lib']

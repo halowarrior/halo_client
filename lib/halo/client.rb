@@ -6,7 +6,6 @@ class DecryptedPayload < BinData::Record
   bit1le :mode
   bit7le :type
   # array :data, :initial_length => Proc.new{ (len * 8 - 12) / 8 }, :type => :bit8le
-
 end
 
 class DecryptedPayload2 < BinData::Record
@@ -15,12 +14,12 @@ class DecryptedPayload2 < BinData::Record
   bit11le :len
   bit1le :something
 
-  string :data, :read_length => 30
+  string :data, read_length: 30
 end
 
 module Halo
   class Client
-    VERSION = 616000
+    VERSION = 616_000
 
     def initialize(host, port, opts = {})
       @host = host
@@ -93,37 +92,36 @@ module Halo
       none, @decryption_key = HaloTea::Crypto.generate_keys(@random_hash, data)
     end
 
-    def verify_client_challenge_response( data )
+    def verify_client_challenge_response(data)
       client_challenge_response =  data[0..31]
-      if ! GameSpy::Challenge.check_response(GameSpy::Challenge.get_response(@challenge), client_challenge_response)
-        raise "Client challenge response verification failed"
+      unless GameSpy::Challenge.check_response(GameSpy::Challenge.get_response(@challenge), client_challenge_response)
+        fail 'Client challenge response verification failed'
       end
     end
 
-    def build_server_challenge_response( data )
+    def build_server_challenge_response(data)
       server_challenge = data[32..63]
       server_challenge_response = GameSpy::Challenge.get_response(server_challenge)
-      Message.new({type: Message::GTI2MsgClientResponse,
-        sn: 1,
-        esn: 1,
-        data: server_challenge_response + @encryption_key + encode_version(VERSION)
-      })
+      Message.new(type: Message::GTI2MsgClientResponse,
+                  sn: 1,
+                  esn: 1,
+                  data: server_challenge_response + @encryption_key + encode_version(VERSION))
     end
 
     def build_client_challenge
       @challenge ||= GameSpy::Challenge.generate
       Message.new(type: Message::GTI2MsgClientChallenge,
-        data: @challenge,
-        sn: 0,
-        esn: 0
-      )
+                  data: @challenge,
+                  sn: 0,
+                  esn: 0
+                 )
     end
 
-    def encode_version( version )
-      [ version ].pack('L<')
+    def encode_version(version)
+      [version].pack('L<')
     end
 
-    def read( len = 20000 )
+    def read(len = 20_000)
       bytes = @socket.recvfrom_nonblock(len) rescue ['']
       @buffer ||= []
       @buffer << bytes.first if bytes.first.length > 0
@@ -133,14 +131,14 @@ module Halo
       read
       if payload = @buffer.shift
         if payload.length >= 7
-          m = Message.new(payload, { decryption_key: @encryption_key })
+          m = Message.new(payload, decryption_key: @encryption_key)
           logger.info("Reading message from server: #{m.explain}")
           m
         end
       end
     end
 
-    def send_message( m )
+    def send_message(m)
       logger.info("Sending message to server: #{m.explain}")
       sent = @socket.send(m.as_bytes, 0)
       logger.info "Bytes sent: #{sent}"
