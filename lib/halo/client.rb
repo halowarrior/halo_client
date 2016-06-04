@@ -26,14 +26,10 @@ module Halo
       @host = host
       @port = port
       @opts = opts
-      @sn = 0
-      @esn = 0
-      @state = :connecting
-      @socket = UDPSocket.new(Socket::AF_INET)
-      @log_file = opts[:log_file]
     end
 
     def connect
+      @socket = UDPSocket.new(Socket::AF_INET)
       @socket.connect(@host, @port)
       @machine = build_state_machine
       @machine.trigger(:connected)
@@ -123,10 +119,6 @@ module Halo
       )
     end
 
-    def change_state new_state
-      @state = new_state.to_sym
-    end
-
     def encode_version( version )
       [ version ].pack('L<')
     end
@@ -141,7 +133,7 @@ module Halo
       read
       if payload = @buffer.shift
         if payload.length >= 7
-          m = Message.new(payload, { decryption_key: @encryption_key2 })
+          m = Message.new(payload, { decryption_key: @encryption_key })
           logger.info("Reading message from server: #{m.explain}")
           m
         end
@@ -154,11 +146,8 @@ module Halo
       logger.info "Bytes sent: #{sent}"
     end
 
-    def format_message( message )
-      message.unpack("h*").first.scan(/../).map{|byte| byte.hex.chr }.join
-    end
-
     def logger
+      @log_file ||= opts[:log_file]
       @logger ||= Logger.new(@log_file ? File.new(@log_file) : STDOUT)
     end
   end
